@@ -160,7 +160,7 @@ def drawPlot(df,type):
             ax.bar_label(bar)
     
     fig = ax.get_figure()
-    draw_figure_w_toolbar(window['fig_cv'].TKCanvas, fig, window['controls_cv'].TKCanvas)
+    return fig
     
 
     
@@ -275,8 +275,10 @@ while True:
     print(event, values)
     if event in (sg.WIN_CLOSED, 'Exit'):  # always,  always give a way out!
         break
-    elif event is 'Plot':
+    elif event == 'Plot':
         # ------------------------------- PASTE YOUR MATPLOTLIB CODE HERE
-        drawPlot(sharedData(user_games(),cleanStoreData()),1)
+        fig = drawPlot(sharedData(user_games(),cleanStoreData()),1)
+        draw_figure_w_toolbar(window['fig_cv'].TKCanvas, fig, window['controls_cv'].TKCanvas)
+
 
 window.close()

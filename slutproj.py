@@ -132,9 +132,30 @@ def sharedData(userLib,storeDf):
     #print(mergedDf.head(10))
     return mergedDf
 
-        
+def isValidSteamID(steam_id):
     
-def drawPlot(df,type):
+    # hämta data
+    url = f"https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v2/?key={apiKey}&steamids={steam_id}"
+    response = requests.get(url)
+    data = response.json()
+
+    # Kollar om det finns data i svaret
+    if "response" in data and "players" in data["response"] and len(data["response"]["players"]) > 0:
+        return True
+
+    elif response.status_code != 200:
+        print("Ej giltlig användar ID")
+        return False
+    else:
+        return False      
+    
+def drawPlot(df,type=int):
+    """
+    Returnerar en figure av en graf utifrån en dataframe
+    dataframe - dataframe som den ska plotta
+    type - typ av graf som den returnerar"""
+
+
     # gör det till en dataframe för att undevika problem + syntax highligthing
     df = pd.DataFrame(df)
 
@@ -149,22 +170,21 @@ def drawPlot(df,type):
     # namn ger kollumnen mer användar vänligt
     df.rename(columns={"playtime_forever":"user_playtime"},inplace=True)
 
-    dfPlaytime = df[['median_playtime','user_playtime','percent_diff','name']]
-    dfPlaytime.sort_values(by="median_playtime")
-    dfPlaytime.set_index('name',inplace=True)
 
     # Typ av graf
     if type == 1:
+        dfPlaytime = df[['median_playtime','user_playtime','percent_diff','name']]
+        dfPlaytime.sort_values(by="median_playtime")
+        dfPlaytime.set_index('name',inplace=True)
         ax = dfPlaytime.plot(kind='barh')
+
+        # Namn ger varje stapel till index
         for i, bar in enumerate(ax.containers):
             ax.bar_label(bar)
-    
-    draw_figure_w_toolbar(window['fig_cv'].TKCanvas, fig, window['controls_cv'].TKCanvas)
-    
 
-    
-
-
+    # hämtar figure
+    fig = ax.get_figure()
+    return fig
 
 
 def draw_figure_w_toolbar(canvas, fig, canvas_toolbar):
@@ -180,11 +200,12 @@ def draw_figure_w_toolbar(canvas, fig, canvas_toolbar):
     toolbar.update()
     figure_canvas_agg.get_tk_widget().pack(side='right', fill='both', expand=1)
 
+
 class Toolbar(NavigationToolbar2Tk):
     def __init__(self, *args, **kwargs):
         super(Toolbar, self).__init__(*args, **kwargs)
 
-
+#-------------------------------SimpleGui--------------------------
 
 def pygMenu():
     sg.theme('black')
@@ -215,23 +236,44 @@ def pygMenu():
             if isValidSteamID(userInput):
                 window["-title"].update("Använar ID noterad; Välj funktion nedan")
 
-            
-def isValidSteamID(steam_id):
-    
-    # hämta data
-    url = f"https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v2/?key={apiKey}&steamids={steam_id}"
-    response = requests.get(url)
-    data = response.json()
 
-    # Kollar om det finns data i svaret
-    if "response" in data and "players" in data["response"] and len(data["response"]["players"]) > 0:
-        return True
 
-    elif response.status_code != 200:
-        print("Ej giltlig användar ID")
-        return False
-    else:
-        return False
+
+
+def sgPlot():
+    layout = [
+        [sg.T('Graph')],
+        [sg.B('Plot'), sg.B('Exit')],
+        [sg.T('Controls:')],
+        [sg.Canvas(key='controls_cv')],
+        [sg.T('Figure:')],
+        [sg.Column(
+            layout=[
+                [sg.Canvas(key='fig_cv',
+                        # it's important that you set this size
+                        size=(400 * 2, 400)
+                        )]
+            ],
+            background_color='#DAE0E6',
+            pad=(0, 0)
+        )],
+        [sg.B('Alive?')]
+    ]
+
+    window = sg.Window('Graph with controls', layout)
+
+    while True:
+        event, values = window.read()
+        print(event, values)
+        if event in (sg.WIN_CLOSED, 'Exit'):  # always,  always give a way out!
+            break
+        elif event == 'Plot':
+            # Ritar plot
+            fig = drawPlot(sharedData(user_games(),cleanStoreData()),1)
+            draw_figure_w_toolbar(window['fig_cv'].TKCanvas, fig, window['controls_cv'].TKCanvas)
+
+
+    window.close()
 
 
 
@@ -239,7 +281,7 @@ def isValidSteamID(steam_id):
 # TEMP 
 #pgPlot(drawPlot(sharedData(user_games(),cleanStoreData()),1))
 #pygMenu()
-drawPlot(sharedData(user_games(),cleanStoreData()),1)
+drawPlot(sharedData(user_games(),cleanStoreData()),type=1)
 endTime = time()
 print("Koden körde på ", round(endTime - sTime))
 
