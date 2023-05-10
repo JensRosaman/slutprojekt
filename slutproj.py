@@ -7,8 +7,6 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg , NavigationTool
 from time import time
 import PySimpleGUI as sg
 
-
-
 # Privata api nyckel till SteamWebApi
 apiKey = "1661C2636C7937D634C34C6DA3218414"
 
@@ -23,7 +21,8 @@ sTime = time()
 # Körs endast 1 gång
 def cleanStoreData():
     "Rensar steamStore.csv och lämnar relevant data --> steamStore DataFrame"
-    path = r"slutprojekt\steamStore.csv" # windows path till filen
+    
+    path = r"steamStore.csv" # windows path till filen
 
     # CSV --> DF
     storeDf = pd.read_csv(path)
@@ -155,7 +154,6 @@ def drawPlot(df,type=int):
     dataframe - dataframe som den ska plotta
     type - typ av graf som den returnerar"""
 
-
     # gör det till en dataframe för att undevika problem + syntax highligthing
     df = pd.DataFrame(df)
 
@@ -165,8 +163,6 @@ def drawPlot(df,type=int):
     # min -> tim
     df["playtime_forever"] = round((df["playtime_forever"] / 60),1)
     df["median_playtime"] = round((df["median_playtime"] / 60),1)
-    
-
     # namn ger kollumnen mer användar vänligt
     df.rename(columns={"playtime_forever":"user_playtime"},inplace=True)
 
@@ -181,6 +177,8 @@ def drawPlot(df,type=int):
         # Namn ger varje stapel till index
         for i, bar in enumerate(ax.containers):
             ax.bar_label(bar)
+        
+        
 
     # hämtar figure
     fig = ax.get_figure()
@@ -243,7 +241,7 @@ def pygMenu():
 def sgPlot():
     layout = [
         [sg.T('Graph')],
-        [sg.B('Plot'), sg.B('Exit')],
+        [sg.B('Plot'), sg.Text("",key="-idText"), sg.Input(default_text="", key="-userid"), sg.Submit() ,  sg.B('Exit')],
         [sg.T('Controls:')],
         [sg.Canvas(key='controls_cv')],
         [sg.T('Figure:')],
@@ -259,14 +257,39 @@ def sgPlot():
         )],
         [sg.B('Alive?')]
     ]
+    window = sg.Window('Graph with controls', layout, finalize=True)
+    
+    ## TEMP
+    userID = None
 
-    window = sg.Window('Graph with controls', layout)
+    # Kollar om användaren redan skrivit in userID för att förbättra användar vänligheten
+    if userID == None:
+        window["-idText"].update("Vänligen skriv användar Id i fältet")
+    else:
+        window["-userid"].update(defualt_text=userID)
+
 
     while True:
         event, values = window.read()
         print(event, values)
-        if event in (sg.WIN_CLOSED, 'Exit'):  # always,  always give a way out!
+        if event in (sg.WIN_CLOSED, 'Exit'):  # Exit knapp
             break
+
+    
+        elif event == "Submit":
+            userInput = values["-userid"]
+            print(f"Användaren skrev in {userInput}")
+            if isValidSteamID(userInput):
+                window["-idText"].update("Användar ID noterad, Tryck på 'plot' för att börja grafa")
+            
+            else:
+                window["-idText"].update("ID fungerade inte, vänlig kontrollera ID")
+                startTime = time()
+                while (time() - startTime) < 1:
+                    color = ('red' if int(time() * 2) % 2 == 0 else 'white')
+                    window["-idText"].update(background_color=color)
+                    window["-userid"].update(text_color=color)
+
         elif event == 'Plot':
             # Ritar plot
             fig = drawPlot(sharedData(user_games(),cleanStoreData()),1)
@@ -276,12 +299,12 @@ def sgPlot():
     window.close()
 
 
-
+sgPlot()
 
 # TEMP 
 #pgPlot(drawPlot(sharedData(user_games(),cleanStoreData()),1))
 #pygMenu()
-drawPlot(sharedData(user_games(),cleanStoreData()),type=1)
+#drawPlot(sharedData(user_games(),cleanStoreData()),type=1)
 endTime = time()
 print("Koden körde på ", round(endTime - sTime))
 
