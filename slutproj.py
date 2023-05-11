@@ -12,7 +12,7 @@ apiKey = "1661C2636C7937D634C34C6DA3218414"
 
 
 
-userID = "76561199195339368"
+#userID = "76561199195339368"
 # wilmer 76561199195339368
 # jag 76561198427126142
 
@@ -54,7 +54,7 @@ def get_owned_games(userID):
     'include_played_free_games': 1
     }
     # Hämatar datan och lägger allt i response
-    print("Kontaktar steam servern...")
+    print(f"Kontaktar steam servern med användar ID {userID}...")
     response = requests.get("http://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/" , params=params)
 
     # kollar om API förfrågan fungerade, exit kod 200 ger lyckad hämtning
@@ -69,7 +69,7 @@ def get_owned_games(userID):
     else:
         raise Exception("Ingen kontakt med steam servern, vänligen försök igen eller undevik funktion tills vidare")
 
-def user_games():
+def user_games(userID):
     "SteamUserID --> dataFrame with users games and playtime"
     # Hämtar användar info från SteamWebAPI
     userData = get_owned_games(userID)
@@ -87,7 +87,6 @@ def user_games():
     # Specifierar den datan som ska tas bort och droppar den
     toDrop = [
          "has_leaderboards",
-         #"playtime_2weeks",
          "content_descriptorids",
          "rtime_last_played",
          "img_icon_url",
@@ -131,15 +130,16 @@ def sharedData(userLib,storeDf):
     #print(mergedDf.head(10))
     return mergedDf
 
-def isValidSteamID(steam_id):
+def isValidSteamID(userID):
     
     # hämta data
-    url = f"https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v2/?key={apiKey}&steamids={steam_id}"
+    url = f"https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v2/?key={apiKey}&steamids={userID}"
     response = requests.get(url)
     data = response.json()
 
-    # Kollar om det finns data i svaret
+    # Kollar om det finns data i svaret, json börjar med en response embedd
     if "response" in data and "players" in data["response"] and len(data["response"]["players"]) > 0:
+        print("Giltligt användar ID")
         return True
 
     elif response.status_code != 200:
@@ -198,7 +198,7 @@ def draw_figure_w_toolbar(canvas, fig, canvas_toolbar):
     toolbar.update()
     figure_canvas_agg.get_tk_widget().pack(side='right', fill='both', expand=1)
 
-
+# Stulen kod ingen aning vad den gör för witch craft
 class Toolbar(NavigationToolbar2Tk):
     def __init__(self, *args, **kwargs):
         super(Toolbar, self).__init__(*args, **kwargs)
@@ -242,6 +242,7 @@ def sgPlot():
     layout = [
         [sg.T('Graph')],
         [sg.B('Plot'), sg.Text("",key="-idText"), sg.Input(default_text="", key="-userid"), sg.Submit() ,  sg.B('Exit')],
+        [sg.T("Exempel ID:"), sg.I("76561198427126142", readonly=True, size=20)],
         [sg.T('Controls:')],
         [sg.Canvas(key='controls_cv')],
         [sg.T('Figure:')],
@@ -258,10 +259,7 @@ def sgPlot():
         [sg.B('Alive?')]
     ]
     window = sg.Window('Graph with controls', layout, finalize=True)
-    
-    ## TEMP
     userID = None
-
     # Kollar om användaren redan skrivit in userID för att förbättra användar vänligheten
     if userID == None:
         window["-idText"].update("Vänligen skriv användar Id i fältet")
@@ -280,20 +278,27 @@ def sgPlot():
             userInput = values["-userid"]
             print(f"Användaren skrev in {userInput}")
             if isValidSteamID(userInput):
+                userID = userInput
                 window["-idText"].update("Användar ID noterad, Tryck på 'plot' för att börja grafa")
             
             else:
                 window["-idText"].update("ID fungerade inte, vänlig kontrollera ID")
-                startTime = time()
-                while (time() - startTime) < 1:
-                    color = ('red' if int(time() * 2) % 2 == 0 else 'white')
-                    window["-idText"].update(background_color=color)
-                    window["-userid"].update(text_color=color)
+                window["-idText"].update(text_color='red')
+
+                #startTime = time()
+                #while (time() - startTime) < 2:
+                    #color = ('red' if int(time() * 2) % 2 == 0 else 'white')
+                    #window["-idText"].update(text_color=color)
+                    
 
         elif event == 'Plot':
             # Ritar plot
-            fig = drawPlot(sharedData(user_games(),cleanStoreData()),1)
-            draw_figure_w_toolbar(window['fig_cv'].TKCanvas, fig, window['controls_cv'].TKCanvas)
+            if userID != None:
+                fig = drawPlot(sharedData(user_games(userID),cleanStoreData()),1)
+                draw_figure_w_toolbar(window['fig_cv'].TKCanvas, fig, window['controls_cv'].TKCanvas)
+            else:
+                window["-idText"].update("Skriv in ID först")
+                window["-idText"].update(text_color='red')
 
 
     window.close()
