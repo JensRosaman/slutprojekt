@@ -148,41 +148,7 @@ def isValidSteamID(userID):
     else:
         return False      
     
-def drawPlot(df,type=int):
-    """
-    Returnerar en figure av en graf utifrån en dataframe
-    dataframe - dataframe som den ska plotta
-    type - typ av graf som den returnerar"""
 
-    # gör det till en dataframe för att undevika problem + syntax highligthing
-    df = pd.DataFrame(df)
-
-    # skapar en till kollumn som visar procentuell skillnad mellan medelmåttigspeltid och användarens
-    df["percent_diff"] = round((df["playtime_forever"]/df["median_playtime"]),1)
-    
-    # min -> tim
-    df["playtime_forever"] = round((df["playtime_forever"] / 60),1)
-    df["median_playtime"] = round((df["median_playtime"] / 60),1)
-    # namn ger kollumnen mer användar vänligt
-    df.rename(columns={"playtime_forever":"user_playtime"},inplace=True)
-
-
-    # Typ av graf
-    if type == 1:
-        dfPlaytime = df[['median_playtime','user_playtime','percent_diff','name']]
-        dfPlaytime.sort_values(by="median_playtime")
-        dfPlaytime.set_index('name',inplace=True)
-        ax = dfPlaytime.plot(kind='barh')
-
-        # Namn ger varje stapel till index
-        for i, bar in enumerate(ax.containers):
-            ax.bar_label(bar)
-        
-        
-
-    # hämtar figure
-    fig = ax.get_figure()
-    return fig
 
 
 def draw_figure_w_toolbar(canvas, fig, canvas_toolbar):
@@ -235,13 +201,44 @@ def pygMenu():
                 window["-title"].update("Använar ID noterad; Välj funktion nedan")
 
 
+class plot:
+    "Skapar och tillåter funktioner relaterade till en matplotlib fig, kan ändra vilka rows som är med"
+    def __init__(self, df) -> None:
+        self.df = pd.DataFrame(df)
+        self.df["percent_diff"] = round((self.df["playtime_forever"] / self.df["median_playtime"]), 1)
+        self.df["playtime_forever"] = round((self.df["playtime_forever"] / 60), 1)
+        self.df["median_playtime"] = round((self.df["median_playtime"] / 60), 1)
+        self.df.rename(columns={"playtime_forever": "user_playtime"}, inplace=True)
 
+        self.dfPlaytime = self.df[['median_playtime', 'user_playtime', 'percent_diff', 'name']].copy()
+        self.dfPlaytime.sort_values(by="median_playtime", inplace=True)
+        self.dfPlaytime.set_index('name', inplace=True)    
+        
+
+    def filterRows(self,rowsToDrop):
+        "filterar vilka rader som är med i dataframen med en lista som input"
+        for name in rowsToDrop:
+            self.dfPlaytime = self.dfPlaytime.drop(self.dfPlaytime[self.dfPlaytime['name'] == name].index)
+
+    def drawFig(self, graphType=1):
+        if graphType == 1:
+            ax = self.dfPlaytime.plot(kind='barh')
+            # Namn ger varje stapel till index
+            for i, bar in enumerate(ax.containers):
+                ax.bar_label(bar)
+            
+            # hämtar figure
+        fig = ax.get_figure()
+        return fig
+    
+ 
 
 
 def sgPlot():
+    "Skapar ett pysimplegui fönster med kontroller där användaren kan se datan och kontrollera den"
     layout = [
         [sg.T('Graph')],
-        [sg.B('Plot'), sg.Text("",key="-idText"), sg.Input(default_text="", key="-userid"), sg.Submit() ,  sg.B('Exit')],
+        [sg.B('Plot'), sg.B('Ändra spel') ,sg.Text("",key="-idText"), sg.Input(default_text="", key="-userid"), sg.Submit() ,  sg.B('Exit')],
         [sg.T("Exempel ID:"), sg.I("76561198427126142", readonly=True, size=20)],
         [sg.T('Controls:')],
         [sg.Canvas(key='controls_cv')],
@@ -260,6 +257,9 @@ def sgPlot():
     ]
     window = sg.Window('Graph with controls', layout, finalize=True)
     userID = None
+
+
+
     # Kollar om användaren redan skrivit in userID för att förbättra användar vänligheten
     if userID == None:
         window["-idText"].update("Vänligen skriv användar Id i fältet")
@@ -273,28 +273,66 @@ def sgPlot():
         if event in (sg.WIN_CLOSED, 'Exit'):  # Exit knapp
             break
 
-    
+        # kollar användarens data om den fungerar och sätter den i så fall --> userID
         elif event == "Submit":
             userInput = values["-userid"]
             print(f"Användaren skrev in {userInput}")
             if isValidSteamID(userInput):
                 userID = userInput
+                df = sharedData(user_games(userID),cleanStoreData())
+                dfPlot = plot(df)
                 window["-idText"].update("Användar ID noterad, Tryck på 'plot' för att börja grafa")
             
             else:
                 window["-idText"].update("ID fungerade inte, vänlig kontrollera ID")
                 window["-idText"].update(text_color='red')
 
-                #startTime = time()
-                #while (time() - startTime) < 2:
-                    #color = ('red' if int(time() * 2) % 2 == 0 else 'white')
-                    #window["-idText"].update(text_color=color)
-                    
+        
+        # Skapar ett til fönster med funktioner för att ta bort uppvisade spel
+        elif event == "Ändra spel":
+            games = df['name'].tolist()
+            # Create the layout for the second window
+            layout2 = [[sg.Text('Second Window')],
+                       [sg.Checkbox(name, key="chk_{name}") for name in games],
+                       [sg.B("Skicka in")],
+                        [sg.Button('Stäng')]]
 
+            # Create the second window
+            window2 = sg.Window('Second Window', layout2, finalize=True)
+
+            # Bring the second window to the front
+            window2.bring_to_front()
+
+            while True:
+                event2, values2 = window2.read()
+
+                if event2 == sg.WINDOW_CLOSED or event2 == 'Stäng':
+                    break
+                
+                elif event2 == "Skicka in":
+                    checkedBoxes = []
+                    for name in games:
+                        if values2["chk_{name}"] is True:
+                            checkedBoxes.append(name)
+                
+                    dfPlot.filterRows(checkedBoxes)
+                    window2.close()
+
+            window2.close()
+
+
+
+
+
+
+
+
+
+        # plottar datan
         elif event == 'Plot':
             # Ritar plot
             if userID != None:
-                fig = drawPlot(sharedData(user_games(userID),cleanStoreData()),1)
+                fig = dfPlot.drawFig()
                 draw_figure_w_toolbar(window['fig_cv'].TKCanvas, fig, window['controls_cv'].TKCanvas)
             else:
                 window["-idText"].update("Skriv in ID först")
