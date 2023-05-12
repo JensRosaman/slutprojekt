@@ -1,5 +1,6 @@
 import requests
 import json
+import os
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -22,10 +23,15 @@ sTime = time()
 def cleanStoreData():
     "Rensar steamStore.csv och lämnar relevant data --> steamStore DataFrame"
     
-    path = r"steamStore.csv" # windows path till filen
+    #path = r"steamStore.csv" # windows path till filen
+    scriptPath = os.path.abspath(__file__)
+    csvFile = "steamStore.csv"
+    filePath = os.path.join(os.path.dirname(scriptPath), csvFile)
+
+
 
     # CSV --> DF
-    storeDf = pd.read_csv(path)
+    storeDf = pd.read_csv(filePath)
     
     # Slänger oanvända kolluner
     toDrop = [
@@ -218,7 +224,7 @@ class plot:
     def filterRows(self,rowsToDrop):
         "filterar vilka rader som är med i dataframen med en lista som input"
         for name in rowsToDrop:
-            self.dfPlaytime = self.dfPlaytime.drop(self.dfPlaytime[self.dfPlaytime['name'] == name].index)
+            self.dfPlaytime = self.dfPlaytime.drop(self.dfPlaytime[self.dfPlaytime['name'] == name].index())
 
     def drawFig(self, graphType=1):
         if graphType == 1:
@@ -234,11 +240,11 @@ class plot:
  
 
 
-def sgPlot():
+def sgPlot(userID = None):
     "Skapar ett pysimplegui fönster med kontroller där användaren kan se datan och kontrollera den"
     layout = [
         [sg.T('Graph')],
-        [sg.B('Plot'), sg.B('Ändra spel') ,sg.Text("",key="-idText"), sg.Input(default_text="", key="-userid"), sg.Submit() ,  sg.B('Exit')],
+        [sg.B('Plot'), sg.B('Ändra spel') ,sg.Text("",key="-idText"), sg.Input(key="-userid"), sg.Submit() ,  sg.B('Exit')],
         [sg.T("Exempel ID:"), sg.I("76561198427126142", readonly=True, size=20)],
         [sg.T('Controls:')],
         [sg.Canvas(key='controls_cv')],
@@ -256,7 +262,6 @@ def sgPlot():
         [sg.B('Alive?')]
     ]
     window = sg.Window('Graph with controls', layout, finalize=True)
-    userID = None
 
 
 
@@ -264,7 +269,7 @@ def sgPlot():
     if userID == None:
         window["-idText"].update("Vänligen skriv användar Id i fältet")
     else:
-        window["-userid"].update(defualt_text=userID)
+        window["-userid"].update(userID)
 
 
     while True:
@@ -282,6 +287,8 @@ def sgPlot():
                 df = sharedData(user_games(userID),cleanStoreData())
                 dfPlot = plot(df)
                 window["-idText"].update("Användar ID noterad, Tryck på 'plot' för att börja grafa")
+                window["-idText"].update(text_color='white')
+
             
             else:
                 window["-idText"].update("ID fungerade inte, vänlig kontrollera ID")
@@ -292,10 +299,18 @@ def sgPlot():
         elif event == "Ändra spel":
             games = df['name'].tolist()
             # Create the layout for the second window
-            layout2 = [[sg.Text('Second Window')],
-                       [sg.Checkbox(name, key="chk_{name}") for name in games],
-                       [sg.B("Skicka in")],
-                        [sg.Button('Stäng')]]
+
+
+
+            checkboxes = [[sg.Checkbox(name, key="chk_{name}") for name in games]]
+            # Stulen kod, chat gpt fixar bredden på collumenn
+            checkbox_row_layouts = [checkboxes[i:i+3] for i in range(0, len(checkboxes), 1)]
+            checkboxCollumn = [[sg.Column(row_layout, vertical_scroll_only=True)] for row_layout in checkbox_row_layouts]
+
+
+            #checkboxCollumn = sg.Column(checkboxes, scrollable=True, vertical_scroll_only=True, size=(3))
+
+            layout2 = [[sg.Text('Second Window')], [checkboxCollumn] ,[sg.B("Skicka in")],[sg.Button('Stäng')]]
 
             # Create the second window
             window2 = sg.Window('Second Window', layout2, finalize=True)
@@ -312,6 +327,7 @@ def sgPlot():
                 elif event2 == "Skicka in":
                     checkedBoxes = []
                     for name in games:
+                        print(f"checking: chk_{name}")
                         if values2["chk_{name}"] is True:
                             checkedBoxes.append(name)
                 
@@ -319,13 +335,6 @@ def sgPlot():
                     window2.close()
 
             window2.close()
-
-
-
-
-
-
-
 
 
         # plottar datan
@@ -342,12 +351,9 @@ def sgPlot():
     window.close()
 
 
-sgPlot()
-
+sgPlot(userID="76561198372292545")
+# vidar 76561198372292545
 # TEMP 
-#pgPlot(drawPlot(sharedData(user_games(),cleanStoreData()),1))
-#pygMenu()
-#drawPlot(sharedData(user_games(),cleanStoreData()),type=1)
 endTime = time()
 print("Koden körde på ", round(endTime - sTime))
 
