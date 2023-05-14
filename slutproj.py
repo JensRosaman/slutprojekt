@@ -18,15 +18,20 @@ apiKey = "1661C2636C7937D634C34C6DA3218414"
 # jag 76561198427126142
 
 sTime = time()
+def getFilePath(fileName):
+    scriptPath = os.path.abspath(__file__)
+    filePath = os.path.join(os.path.dirname(scriptPath), fileName)
+    return filePath
+
+
 
 # Körs endast 1 gång
 def cleanStoreData():
     "Rensar steamStore.csv och lämnar relevant data --> steamStore DataFrame"
     
-    #path = r"steamStore.csv" # windows path till filen
     scriptPath = os.path.abspath(__file__)
     csvFile = "steamStore.csv"
-    filePath = os.path.join(os.path.dirname(scriptPath), csvFile)
+    filePath = getFilePath(csvFile)
 
 
 
@@ -51,7 +56,7 @@ def cleanStoreData():
     return storeDf
 
 
-def get_owned_games(userID):
+def get_owned_games(userID: str):
     # Anger de saker som APIn ska hämta
     params = {
     'key': apiKey,
@@ -75,7 +80,7 @@ def get_owned_games(userID):
     else:
         raise Exception("Ingen kontakt med steam servern, vänligen försök igen eller undevik funktion tills vidare")
 
-def user_games(userID):
+def user_games(userID: str):
     "SteamUserID --> dataFrame with users games and playtime"
     # Hämtar användar info från SteamWebAPI
     userData = get_owned_games(userID)
@@ -133,11 +138,10 @@ def sharedData(userLib,storeDf):
 
     mergedDf = sharedDf.merge(userLib[['appid', 'playtime_forever']], on='appid', how='left')
     mergedDf.to_csv("merged.csv")
-    #print(mergedDf.head(10))
     return mergedDf
 
-def isValidSteamID(userID):
-    
+def isValidSteamID(userID: str) -> bool:
+    "Kollar om det givna användar id'et är giltligt och finns i steam databasen"
     # hämta data
     url = f"https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v2/?key={apiKey}&steamids={userID}"
     response = requests.get(url)
@@ -156,9 +160,10 @@ def isValidSteamID(userID):
     
 
 
-
+# stulen kod
 def draw_figure_w_toolbar(canvas, fig, canvas_toolbar):
     if canvas.children:
+        # förstör barn
         for child in canvas.winfo_children():
             child.destroy()
     if canvas_toolbar.children:
@@ -180,6 +185,7 @@ class Toolbar(NavigationToolbar2Tk):
 def pygMenu():
     sg.theme('black')
     layout = [
+            [sg.Image(filename=getFilePath("litenNyman.png"),size=(None, None), key="-bg")],
             [sg.Text("""Vänligen skriv in din steam userID \n Alternativt använd ett exempel id nedan:
                         Litet bibleotek - 76561199195339368
                         Stort - 76561198427126142""",key="-title")],
@@ -190,13 +196,23 @@ def pygMenu():
             [sg.Button("hej")],
             [sg.Button("hej")],
               ]
-
-    window = sg.Window("menu", 
-                       layout,
-                       default_button_element_size=(12, 1))
+    imgPath = getFilePath("Steam.jpg")
+    window = sg.Window(
+        "menu", 
+        layout,
+        default_button_element_size=(12, 1),
+        titlebar_icon=r"C:\Users\olive\Pictures\litenNyman.png",
+        #no_titlebar=True,
+        #background_image=imgPath,
+        grab_anywhere=True,
+        finalize=True,
+        )
+    
+    window["-bg"].update(size=window.size)
     while True:
         event, values = window.read()
-        if event in (sg.WIN_CLOSED, 'Exit'):
+        if event in (sg.WIN_CLOSED, 'Exit') or event == "hej":
+            window.close()
             break
         
         if event == "Skicka in":
@@ -219,14 +235,20 @@ class plot:
         self.dfPlaytime = self.df[['median_playtime', 'user_playtime', 'percent_diff', 'name']].copy()
         self.dfPlaytime.sort_values(by="median_playtime", inplace=True)
         self.dfPlaytime.set_index('name', inplace=True)    
-        
+        self.maxDiff = self.dfPlaytime['percent_diff'].max()
+        self.nameMaxDiff = self.dfPlaytime['percent_diff'].idxmax()
 
     def filterRows(self,rowsToDrop):
         "filterar vilka rader som är med i dataframen med en lista som input"
         for name in rowsToDrop:
-            self.dfPlaytime = self.dfPlaytime.drop(self.dfPlaytime[self.dfPlaytime['name'] == name].index())
+            #self.dfPlaytime.drop(self.dfPlaytime[self.dfPlaytime['name'] == name].index, inplace=True)
+            self.dfPlaytime.drop(self.dfPlaytime[self.dfPlaytime.index == name].index, inplace=True)
+            self.df.drop(self.df[self.df.index == name].index, inplace=True)
+
 
     def drawFig(self, graphType=1):
+        #self.dfPlaytime.set_index('name', inplace=True)    
+
         if graphType == 1:
             ax = self.dfPlaytime.plot(kind='barh')
             # Namn ger varje stapel till index
@@ -240,15 +262,39 @@ class plot:
  
 
 
-def sgPlot(userID = None):
+def sgPlot(userID:str = None):
     "Skapar ett pysimplegui fönster med kontroller där användaren kan se datan och kontrollera den"
+
+    def displayPlot():
+        "Visar grafen i pysimplegui fönstret"
+        if userID != None:
+                fig = dfPlot.drawFig()
+                draw_figure_w_toolbar(window['fig_cv'].TKCanvas, fig, window['controls_cv'].TKCanvas)
+        else:
+            window["-idText"].update("Skriv in ID först")
+            window["-idText"].update(text_color='red')
+
+        # Gets the steam username
+        url = f'http://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?key={apiKey}&steamids={userID}'
+        response = requests.get(url)
+        data = response.json()
+        
+        if 'response' in data and 'players' in data['response']:
+            players = data['response']['players']
+            if players:
+                username = players[0]['personaname']
+            
+        print(username)
+
+    
+    sg.theme("DarkBlue")
     layout = [
         [sg.T('Graph')],
-        [sg.B('Plot'), sg.B('Ändra spel') ,sg.Text("",key="-idText"), sg.Input(key="-userid"), sg.Submit() ,  sg.B('Exit')],
+        [sg.B('Plot'), sg.B('Ändra spel'), sg.B("Ändra staplar") ,sg.Text("",key="-idText"), sg.Input(key="-userid", background_color="white"), sg.Submit() ,  sg.B('Exit')],
         [sg.T("Exempel ID:"), sg.I("76561198427126142", readonly=True, size=20)],
         [sg.T('Controls:')],
         [sg.Canvas(key='controls_cv')],
-        [sg.T('Figure:')],
+        [sg.T(f'Visar: {username}')],
         [sg.Column(
             layout=[
                 [sg.Canvas(key='fig_cv',
@@ -261,7 +307,7 @@ def sgPlot(userID = None):
         )],
         [sg.B('Alive?')]
     ]
-    window = sg.Window('Graph with controls', layout, finalize=True)
+    window = sg.Window('Graph with controls', layout, grab_anywhere_using_control=True , finalize=True)
 
 
 
@@ -270,7 +316,9 @@ def sgPlot(userID = None):
         window["-idText"].update("Vänligen skriv användar Id i fältet")
     else:
         window["-userid"].update(userID)
-
+        df = sharedData(user_games(userID),cleanStoreData())
+        dfPlot = plot(df)
+        displayPlot()
 
     while True:
         event, values = window.read()
@@ -298,24 +346,19 @@ def sgPlot(userID = None):
         # Skapar ett til fönster med funktioner för att ta bort uppvisade spel
         elif event == "Ändra spel":
             games = df['name'].tolist()
-            # Create the layout for the second window
+            checkboxes = [[sg.Checkbox(name, key=f"chk_{name}")] for name in games]
 
+            checkbox_column = sg.Column(checkboxes, scrollable=True, vertical_scroll_only=True, size=(300, 200))
 
-
-            checkboxes = [[sg.Checkbox(name, key="chk_{name}") for name in games]]
-            # Stulen kod, chat gpt fixar bredden på collumenn
-            checkbox_row_layouts = [checkboxes[i:i+3] for i in range(0, len(checkboxes), 1)]
-            checkboxCollumn = [[sg.Column(row_layout, vertical_scroll_only=True)] for row_layout in checkbox_row_layouts]
-
-
-            #checkboxCollumn = sg.Column(checkboxes, scrollable=True, vertical_scroll_only=True, size=(3))
-
-            layout2 = [[sg.Text('Second Window')], [checkboxCollumn] ,[sg.B("Skicka in")],[sg.Button('Stäng')]]
+            layout2 = [
+                [sg.Text('Tar bort de valda spelen som standard läge'),sg.Checkbox("Visa endast valda spel:", key="mode")],
+                [checkbox_column],
+                [sg.B("Skicka in")],
+                [sg.Button('Stäng')]
+            ]
 
             # Create the second window
             window2 = sg.Window('Second Window', layout2, finalize=True)
-
-            # Bring the second window to the front
             window2.bring_to_front()
 
             while True:
@@ -323,37 +366,87 @@ def sgPlot(userID = None):
 
                 if event2 == sg.WINDOW_CLOSED or event2 == 'Stäng':
                     break
-                
+
                 elif event2 == "Skicka in":
                     checkedBoxes = []
                     for name in games:
-                        print(f"checking: chk_{name}")
-                        if values2["chk_{name}"] is True:
+                        if values2[f"chk_{name}"] is True:
                             checkedBoxes.append(name)
-                
-                    dfPlot.filterRows(checkedBoxes)
+                    print("Användaren bockade av: ", checkedBoxes)
+
+                    # Om läge två är valt ta bort alla spel förutom de valda
+                    if values2["mode"] is True:
+                        # tar bort de valda värdena från inputen till filterRows
+                        gamesToRemove = list(set(dfPlot.dfPlaytime.index) - set(checkedBoxes))
+                        #filterar raderna
+                        dfPlot.filterRows(gamesToRemove)
+                    else:
+                        # Tar bort de valda elementen
+                        dfPlot.filterRows(checkedBoxes)
+                    displayPlot()
                     window2.close()
 
             window2.close()
 
 
+
+
+
+
+        elif event == "Ändra staplar":
+            # Hämtar de collumner som plottas
+            columns = dfPlot.dfPlaytime.columns.to_list()
+            checkboxes = [[sg.Checkbox(column, key=f"chk_{column}")] for column in columns]
+
+            checkboxColumn = sg.Column(checkboxes, scrollable=True, vertical_scroll_only=True, size=(300, 200))
+
+            layout3 = [
+                [sg.Text('Välj de spel att ta bort')],
+                [checkboxColumn],
+                [sg.B("Skicka in")],
+                [sg.Button('Stäng')]
+            ]
+
+            # Create the second window
+            window3 = sg.Window('Second Window', layout3, finalize=True)
+            window3.bring_to_front()
+
+            while True:
+                event3, values3 = window3.read()
+
+                if event3 == sg.WINDOW_CLOSED or event3 == 'Stäng':
+                    break
+
+                elif event3 == "Skicka in":
+                    checkedBoxes = []
+                    for column in columns:
+                        if values3[f"chk_{column}"] is True:
+                            checkedBoxes.append(column)
+                    print("Användaren bockade av: ", checkedBoxes)
+                    dfPlot.dfPlaytime.drop(checkedBoxes, axis=1, inplace=True)
+                    displayPlot()
+                    window3.close()
+
+            window3.close()
+
+
+
+
+
+
         # plottar datan
         elif event == 'Plot':
             # Ritar plot
-            if userID != None:
-                fig = dfPlot.drawFig()
-                draw_figure_w_toolbar(window['fig_cv'].TKCanvas, fig, window['controls_cv'].TKCanvas)
-            else:
-                window["-idText"].update("Skriv in ID först")
-                window["-idText"].update(text_color='red')
+            displayPlot()
 
 
     window.close()
 
-
-sgPlot(userID="76561198372292545")
-# vidar 76561198372292545
-# TEMP 
-endTime = time()
-print("Koden körde på ", round(endTime - sTime))
+if __name__ == "__main__":
+    #pygMenu()
+    sgPlot(userID="76561198372292545")
+    # vidar 76561198372292545
+    # TEMP 
+    endTime = time()
+    print("Koden körde på ", round(endTime - sTime))
 
