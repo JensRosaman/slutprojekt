@@ -13,9 +13,6 @@ apiKey = "1661C2636C7937D634C34C6DA3218414"
 
 
 
-#userID = "76561199195339368"
-# wilmer 76561199195339368
-# jag 76561198427126142
 
 sTime = time()
 def getFilePath(fileName):
@@ -29,7 +26,7 @@ def getFilePath(fileName):
 def cleanStoreData():
     "Rensar steamStore.csv och lämnar relevant data --> steamStore DataFrame"
     
-    scriptPath = os.path.abspath(__file__)
+    
     csvFile = "steamStore.csv"
     filePath = getFilePath(csvFile)
 
@@ -86,8 +83,7 @@ def user_games(userID: str):
     userData = get_owned_games(userID)
 
 
-    #with open(r'slutprojekt\data\user_data.json', 'r') as f:
-        #userData = json.load(f)
+ 
     
     # Tar ut den nested datan ur json objektet --> användarens spel och tid spelat
     userLib = userData["games"]
@@ -116,6 +112,8 @@ def user_games(userID: str):
 
 def sharedData(userLib,storeDf):
     "samlar den delade datan i en df. Input: userLib,storeDf"
+
+    # syntax higlighting
     storeDf = pd.DataFrame(storeDf)
     userLib = pd.DataFrame(userLib)
     todrop = [
@@ -124,25 +122,18 @@ def sharedData(userLib,storeDf):
         "achievements",
     ]
     storeDf.drop(todrop,axis=1,inplace=True)
-    #oldstoreDf = storeDf.copy()
-    #for index, row in oldstoreDf.iterrows():
-        #if row["appid"] in userLib["appid"].values:
-            #print(row["appid"], " found")
-            #continue
-        #else:
-            #storeDf.drop(index,inplace=True)
 
     # Skapar en df endast med appid som delas av både StoreDf och userlib
     sharedDf = storeDf[storeDf['appid'].isin(userLib['appid'])].reset_index(drop=True).copy(deep=True)
     userLib = userLib[userLib['appid'].isin(storeDf['appid'])].reset_index(drop=True).copy(deep=True)
 
+    #Sätter ihop dem
     mergedDf = sharedDf.merge(userLib[['appid', 'playtime_forever']], on='appid', how='left')
-    mergedDf.to_csv("merged.csv")
     return mergedDf
 
 def isValidSteamID(userID: str) -> bool:
     "Kollar om det givna användar id'et är giltligt och finns i steam databasen"
-    # hämta data
+    # hämtar data
     url = f"https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v2/?key={apiKey}&steamids={userID}"
     response = requests.get(url)
     data = response.json()
@@ -160,7 +151,7 @@ def isValidSteamID(userID: str) -> bool:
     
 
 
-# stulen kod
+# stulen kod github
 def draw_figure_w_toolbar(canvas, fig, canvas_toolbar):
     if canvas.children:
         # förstör barn
@@ -175,57 +166,16 @@ def draw_figure_w_toolbar(canvas, fig, canvas_toolbar):
     toolbar.update()
     figure_canvas_agg.get_tk_widget().pack(side='right', fill='both', expand=1)
 
-# Stulen kod ingen aning vad den gör för witch craft
+# witch craft
 class Toolbar(NavigationToolbar2Tk):
     def __init__(self, *args, **kwargs):
         super(Toolbar, self).__init__(*args, **kwargs)
 
 #-------------------------------SimpleGui--------------------------
 
-def pygMenu():
-    sg.theme('black')
-    layout = [
-            [sg.Image(filename=getFilePath("litenNyman.png"),size=(None, None), key="-bg")],
-            [sg.Text("""Vänligen skriv in din steam userID \n Alternativt använd ett exempel id nedan:
-                        Litet bibleotek - 76561199195339368
-                        Stort - 76561198427126142""",key="-title")],
-            [sg.Input(key="-userid")],
-            [sg.Button("Skicka in")],
-            [sg.Button("hej")],
-            [sg.Button("hej")],
-            [sg.Button("hej")],
-            [sg.Button("hej")],
-              ]
-    imgPath = getFilePath("Steam.jpg")
-    window = sg.Window(
-        "menu", 
-        layout,
-        default_button_element_size=(12, 1),
-        titlebar_icon=r"C:\Users\olive\Pictures\litenNyman.png",
-        #no_titlebar=True,
-        #background_image=imgPath,
-        grab_anywhere=True,
-        finalize=True,
-        )
-    
-    window["-bg"].update(size=window.size)
-    while True:
-        event, values = window.read()
-        if event in (sg.WIN_CLOSED, 'Exit') or event == "hej":
-            window.close()
-            break
-        
-        if event == "Skicka in":
-            userInput = values["-userid"]
-            print(f"Användaren skrev in {userInput}")
-
-            if isValidSteamID(userInput):
-                window["-title"].update("Använar ID noterad; Välj funktion nedan")
-
-
 class plot:
     """
-    Skapar och tillåter funktioner relaterade till en matplotlib fig, kan ändra vilka rows som är med.
+    Skapar och tillhandahåller funktioner relaterade till en matplotlib fig, kan ändra vilka rows som är med.
     rowsToDisplay: Anger hur många rader top till botten av de mest spelade spelen utifrån användaren ska visas i .drawFig
     """
     def __init__(self, df: int = 10) -> None:
@@ -238,11 +188,14 @@ class plot:
         self.df["median_playtime"] = round((self.df["median_playtime"] / 60), 1)
 
         #Updatetar namn för att förbättra användarvänligheten
-        self.df.rename(columns={"playtime_forever": "user_playtime"}, inplace=True)
+        self.df.rename(columns={"playtime_forever": "User Playtime"}, inplace=True)
 
-        self.dfPlaytime = self.df[['median_playtime', 'user_playtime', 'percent_diff', 'name']].copy()
-        self.dfPlaytime.sort_values(by="median_playtime", inplace=True)
-        self.dfPlaytime.set_index('name', inplace=True)    
+        self.dfPlaytime = self.df[['median_playtime', 'User Playtime', 'percent_diff', 'name']].copy()
+        self.dfPlaytime.set_index('name', inplace=True) 
+        self.dfPlaytime.sort_values(by="User Playtime", inplace=True, axis=0)
+
+        # Tar bort värden som är "inf" som är en bug
+        self.dfPlaytime['percent_diff'].replace(np.inf, 0, inplace=True)
         self.maxDiff = self.dfPlaytime['percent_diff'].max()
         self.nameMaxDiff = self.dfPlaytime['percent_diff'].idxmax()
 
@@ -262,14 +215,15 @@ class plot:
         if graphType == 1:
             if rowsToDisplay is None:
                 ax = self.dfPlaytime.plot(kind='barh')
-            
+                print("visar alla spel")
             else:
                 ax = self.dfPlaytime.head(rowsToDisplay).plot(kind="barh")
-            
-            # Namn ger varje stapel till index
+                print(f"visar {rowsToDisplay} spel")
+            # Sätter stapelns värde bredvid stapeln - https://towardsdatascience.com/7-steps-to-help-you-make-your-matplotlib-bar-charts-beautiful-f87419cb14cb
             for i, bar in enumerate(ax.containers):
                     ax.bar_label(bar)
-                    
+
+            ax.spines[['right', "top", "bottom"]].set_visible(False)       
             # hämtar figure
         fig = ax.get_figure()
         return fig
@@ -282,44 +236,49 @@ def sgPlot(userID:str = None):
 
     def updateData():
         "Visar grafen i pysimplegui fönstret"
+
+        # Kontrollerar att använder id är anget och skapar en figur och plottar den
         if userID != None:
-                fig = dfPlot.drawFig()
+                fig = dfPlot.drawFig(rowsToDisplay=rowsToDisplay)
                 draw_figure_w_toolbar(window['fig_cv'].TKCanvas, fig, window['controls_cv'].TKCanvas)
         else:
             window["-idText"].update("Skriv in ID först")
             window["-idText"].update(text_color='red')
 
-        # Gets the steam username
-        url = f'http://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?key={apiKey}&steamids={userID}'
-        response = requests.get(url)
-        data = response.json()
-        
-        if 'response' in data and 'players' in data['response']:
-            players = data['response']['players']
-            if players:
-                username = players[0]['personaname']
+        # Hämtar steam användar namnet hård kodat in wilmer pga olämligt namn
+        if userID != "76561199195339368":
+            url = f'http://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?key={apiKey}&steamids={userID}'
+            response = requests.get(url)
+            data = response.json()
+            
+            if 'response' in data and 'players' in data['response']:
+                players = data['response']['players']
+                if players:
+                    username = players[0]['personaname']
+            else:
+                print("Problem med att hämta användarnamn")
+            
         else:
-            print("Problem med att hämta användarnamn")
-        
+            username = "Wilmer"
         window["-graphTitle"].update(f"Visar: {username}")
-        print("Showing ", username)
-
+        print("Visar ", username)
+        window["-mostplayed"].update(f"Du har spelat {dfPlot.nameMaxDiff} {dfPlot.maxDiff} gånger mer än den meddelmåtigaspelaren!")
     # sätter ett defualt använddar namn innan användaren skrivit in sitt ID
     username = "Ingen"
 
 
     # Specifierar mängden data som ska plotas
-    dataAmount = 5
+    rowsToDisplay = 15
 
 
 
     sg.theme("DarkBlue")
+    # skapar layout
     layout = [
-        [sg.T('Graph')],
-        [sg.B('Plot'), sg.B('Ändra spel'), sg.B("Ändra staplar") ,sg.Text("",key="-idText"), sg.Input(key="-userid", background_color="white"), sg.Submit("Submit/reset") ,  sg.B('Exit')],
-        [sg.T("Exempel ID:"), sg.I("76561198427126142", readonly=True, size=20)],
+        [sg.B('Ändra spel'), sg.B("Ändra staplar") ,sg.Text("",key="-idText"), sg.Input(key="-userid", background_color="white", text_color="Black"), sg.Submit("Submit/reset") ,  sg.B('Exit')],
+        [sg.T('Rader som plottas, skriv "Alla" för att visa alla', key="-rowTitle"),sg.Input(f"{rowsToDisplay}", size=5, key="-rows"), sg.Submit("Ange") , sg.T("Exempel ID:"), sg.I("76561199195339368", readonly=True, size=20, text_color="black")],
         [sg.T('Controls:')],
-        [sg.Canvas(key='controls_cv')],
+        [sg.Canvas(key='controls_cv'), sg.T("", key="-mostplayed")],
         [sg.Text(f'Visar: {username}',key="-graphTitle")],
         [sg.Column(
             layout=[
@@ -331,9 +290,9 @@ def sgPlot(userID:str = None):
             background_color='#DAE0E6',
             pad=(0, 0)
         )],
-        [sg.B('Alive?')]
     ]
-    window = sg.Window('Graph with controls', layout, grab_anywhere_using_control=True , finalize=True)
+    # skapar fönstret
+    window = sg.Window('Steam Graph', layout, grab_anywhere_using_control=True , finalize=True)
 
 
 
@@ -342,7 +301,7 @@ def sgPlot(userID:str = None):
         window["-idText"].update("Vänligen skriv användar Id i fältet")
     else:
         window["-userid"].update(userID)
-        df = sharedData(user_games(userID),cleanStoreData())
+        df = sharedData(user_games(userID),cleanedStoreData)
         dfPlot = plot(df)
         updateData()
 
@@ -351,14 +310,32 @@ def sgPlot(userID:str = None):
         print(event, values)
         if event in (sg.WIN_CLOSED, 'Exit'):  # Exit knapp
             break
-
+            
+        elif event == "Ange":
+            userInput = values["-rows"]
+            try:
+                if userInput == "Alla":
+                    rowsToDisplay = None
+                else:
+                    userInput = int(userInput)
+                    if userInput <= len(dfPlot.dfPlaytime.index.to_list()):
+                        rowsToDisplay = userInput
+                    else:
+                        window["-rows"].update(f"{rowsToDisplay}")
+                
+                window["-rowTitle"].update("Nytt värde noterat")
+                updateData()
+            except:
+                print("Exception förebyggd")
+                window["-rows"].update(f"{rowsToDisplay}")
+            
         # kollar användarens data om den fungerar och sätter den i så fall --> userID
         elif event == "Submit/reset":
             userInput = values["-userid"]
             print(f"Användaren skrev in {userInput}")
             if isValidSteamID(userInput):
                 userID = userInput
-                df = sharedData(user_games(userID),cleanStoreData())
+                df = sharedData(user_games(userID),cleanedStoreData)
                 dfPlot = plot(df)
                 window["-idText"].update("Användar ID noterad")
                 window["-idText"].update(text_color='white')
@@ -379,6 +356,7 @@ def sgPlot(userID:str = None):
 
             layout2 = [
                 [sg.Text('Tar bort de valda spelen som standard läge'),sg.Checkbox("Visa endast valda spel:", key="mode")],
+                [sg.Text("", key="-errorText", text_color='red')],
                 [checkbox_column],
                 [sg.B("Skicka in")],
                 [sg.Button('Stäng')]
@@ -408,8 +386,11 @@ def sgPlot(userID:str = None):
                         #filterar raderna
                         dfPlot.filterRows(gamesToRemove)
                     else:
-                        # Tar bort de valda elementen
-                        dfPlot.filterRows(checkedBoxes)
+                        if len(checkedBoxes) >= len(dfPlot.dfPlaytime.index.to_list()):
+                            window["-errorText"].update("Du kan inte bocka av alla spel")
+                        else:   
+                            # Tar bort de valda elementen
+                            dfPlot.filterRows(checkedBoxes)
                     updateData()
                     window2.close()
 
@@ -428,14 +409,14 @@ def sgPlot(userID:str = None):
             checkboxColumn = sg.Column(checkboxes, scrollable=True, vertical_scroll_only=True, size=(300, 200))
 
             layout3 = [
-                [sg.Text('Välj de spel att ta bort')],
+                [sg.Text('Välj de staplar som skall tas att ta bort')],
                 [checkboxColumn],
                 [sg.B("Skicka in")],
                 [sg.Button('Stäng')]
             ]
 
             # Create the second window
-            window3 = sg.Window('Second Window', layout3, finalize=True)
+            window3 = sg.Window('Ändra staplar', layout3, finalize=True)
             window3.bring_to_front()
 
             while True:
@@ -455,22 +436,10 @@ def sgPlot(userID:str = None):
                     window3.close()
 
             window3.close()
-
-
-
-
-
-
-        # plottar datan
-        elif event == 'Plot':
-            # Ritar plot
-            updateData()
-
-
     window.close()
 
 if __name__ == "__main__":
-    #pygMenu()
+    cleanedStoreData = cleanStoreData()
     sgPlot(userID="76561198372292545")
     # vidar 76561198372292545
     # TEMP 
