@@ -228,7 +228,7 @@ class plot:
     Skapar och tillåter funktioner relaterade till en matplotlib fig, kan ändra vilka rows som är med.
     rowsToDisplay: Anger hur många rader top till botten av de mest spelade spelen utifrån användaren ska visas i .drawFig
     """
-    def __init__(self, df, rowsToDisplay: int = 10) -> None:
+    def __init__(self, df: int = 10) -> None:
         self.df = pd.DataFrame(df)
         # Skapar en kolumn där förhållandet mellan de två andra kollumnerna visas
         self.df["percent_diff"] = round((self.df["playtime_forever"] / self.df["median_playtime"]), 1)
@@ -245,7 +245,6 @@ class plot:
         self.dfPlaytime.set_index('name', inplace=True)    
         self.maxDiff = self.dfPlaytime['percent_diff'].max()
         self.nameMaxDiff = self.dfPlaytime['percent_diff'].idxmax()
-        self.dfPlaytimeHead = self.dfPlaytime.head(rowsToDisplay)
 
     def changeHead(self, rowsToDisplay):
         "Changes the dfPlaytimeHead value to a new specefied value"
@@ -258,13 +257,19 @@ class plot:
             self.df.drop(self.df[self.df.index == name].index, inplace=True)
 
 
-    def drawFig(self, graphType=1):
+    def drawFig(self, graphType: int=1, rowsToDisplay: int = None):
+        "Ritar ploten och returnerar en figure"
         if graphType == 1:
-            ax = self.dfPlaytimeHead.plot(kind='barh')
+            if rowsToDisplay is None:
+                ax = self.dfPlaytime.plot(kind='barh')
+            
+            else:
+                ax = self.dfPlaytime.head(rowsToDisplay).plot(kind="barh")
+            
             # Namn ger varje stapel till index
             for i, bar in enumerate(ax.containers):
-                ax.bar_label(bar)
-            
+                    ax.bar_label(bar)
+                    
             # hämtar figure
         fig = ax.get_figure()
         return fig
@@ -367,7 +372,7 @@ def sgPlot(userID:str = None):
         
         # Skapar ett til fönster med funktioner för att ta bort uppvisade spel
         elif event == "Ändra spel":
-            games = dfPlot.dfPlaytimeHead.index.to_list()
+            games = dfPlot.dfPlaytime.index.to_list()
             checkboxes = [[sg.Checkbox(name, key=f"chk_{name}")] for name in games]
 
             checkbox_column = sg.Column(checkboxes, scrollable=True, vertical_scroll_only=True, size=(300, 200))
