@@ -224,12 +224,20 @@ def pygMenu():
 
 
 class plot:
-    "Skapar och tillåter funktioner relaterade till en matplotlib fig, kan ändra vilka rows som är med"
-    def __init__(self, df) -> None:
+    """
+    Skapar och tillåter funktioner relaterade till en matplotlib fig, kan ändra vilka rows som är med.
+    rowsToDisplay: Anger hur många rader top till botten av de mest spelade spelen utifrån användaren ska visas i .drawFig
+    """
+    def __init__(self, df, rowsToDisplay: int = 10) -> None:
         self.df = pd.DataFrame(df)
+        # Skapar en kolumn där förhållandet mellan de två andra kollumnerna visas
         self.df["percent_diff"] = round((self.df["playtime_forever"] / self.df["median_playtime"]), 1)
+
+        # Omvandlar från minut -> timmar och avrundar
         self.df["playtime_forever"] = round((self.df["playtime_forever"] / 60), 1)
         self.df["median_playtime"] = round((self.df["median_playtime"] / 60), 1)
+
+        #Updatetar namn för att förbättra användarvänligheten
         self.df.rename(columns={"playtime_forever": "user_playtime"}, inplace=True)
 
         self.dfPlaytime = self.df[['median_playtime', 'user_playtime', 'percent_diff', 'name']].copy()
@@ -237,20 +245,22 @@ class plot:
         self.dfPlaytime.set_index('name', inplace=True)    
         self.maxDiff = self.dfPlaytime['percent_diff'].max()
         self.nameMaxDiff = self.dfPlaytime['percent_diff'].idxmax()
+        self.dfPlaytimeHead = self.dfPlaytime.head(rowsToDisplay)
+
+    def changeHead(self, rowsToDisplay):
+        "Changes the dfPlaytimeHead value to a new specefied value"
+        self.dfPlaytimeHead = self.dfPlaytime.head(rowsToDisplay)
 
     def filterRows(self,rowsToDrop):
         "filterar vilka rader som är med i dataframen med en lista som input"
         for name in rowsToDrop:
-            #self.dfPlaytime.drop(self.dfPlaytime[self.dfPlaytime['name'] == name].index, inplace=True)
             self.dfPlaytime.drop(self.dfPlaytime[self.dfPlaytime.index == name].index, inplace=True)
             self.df.drop(self.df[self.df.index == name].index, inplace=True)
 
 
     def drawFig(self, graphType=1):
-        #self.dfPlaytime.set_index('name', inplace=True)    
-
         if graphType == 1:
-            ax = self.dfPlaytime.plot(kind='barh')
+            ax = self.dfPlaytimeHead.plot(kind='barh')
             # Namn ger varje stapel till index
             for i, bar in enumerate(ax.containers):
                 ax.bar_label(bar)
@@ -265,7 +275,7 @@ class plot:
 def sgPlot(userID:str = None):
     "Skapar ett pysimplegui fönster med kontroller där användaren kan se datan och kontrollera den"
 
-    def displayPlot():
+    def updateData():
         "Visar grafen i pysimplegui fönstret"
         if userID != None:
                 fig = dfPlot.drawFig()
@@ -283,18 +293,29 @@ def sgPlot(userID:str = None):
             players = data['response']['players']
             if players:
                 username = players[0]['personaname']
-            
-        print(username)
+        else:
+            print("Problem med att hämta användarnamn")
+        
+        window["-graphTitle"].update(f"Visar: {username}")
+        print("Showing ", username)
 
-    
+    # sätter ett defualt använddar namn innan användaren skrivit in sitt ID
+    username = "Ingen"
+
+
+    # Specifierar mängden data som ska plotas
+    dataAmount = 5
+
+
+
     sg.theme("DarkBlue")
     layout = [
         [sg.T('Graph')],
-        [sg.B('Plot'), sg.B('Ändra spel'), sg.B("Ändra staplar") ,sg.Text("",key="-idText"), sg.Input(key="-userid", background_color="white"), sg.Submit() ,  sg.B('Exit')],
+        [sg.B('Plot'), sg.B('Ändra spel'), sg.B("Ändra staplar") ,sg.Text("",key="-idText"), sg.Input(key="-userid", background_color="white"), sg.Submit("Submit/reset") ,  sg.B('Exit')],
         [sg.T("Exempel ID:"), sg.I("76561198427126142", readonly=True, size=20)],
         [sg.T('Controls:')],
         [sg.Canvas(key='controls_cv')],
-        [sg.T(f'Visar: {username}')],
+        [sg.Text(f'Visar: {username}',key="-graphTitle")],
         [sg.Column(
             layout=[
                 [sg.Canvas(key='fig_cv',
@@ -318,7 +339,7 @@ def sgPlot(userID:str = None):
         window["-userid"].update(userID)
         df = sharedData(user_games(userID),cleanStoreData())
         dfPlot = plot(df)
-        displayPlot()
+        updateData()
 
     while True:
         event, values = window.read()
@@ -327,15 +348,16 @@ def sgPlot(userID:str = None):
             break
 
         # kollar användarens data om den fungerar och sätter den i så fall --> userID
-        elif event == "Submit":
+        elif event == "Submit/reset":
             userInput = values["-userid"]
             print(f"Användaren skrev in {userInput}")
             if isValidSteamID(userInput):
                 userID = userInput
                 df = sharedData(user_games(userID),cleanStoreData())
                 dfPlot = plot(df)
-                window["-idText"].update("Användar ID noterad, Tryck på 'plot' för att börja grafa")
+                window["-idText"].update("Användar ID noterad")
                 window["-idText"].update(text_color='white')
+                updateData()
 
             
             else:
@@ -345,7 +367,7 @@ def sgPlot(userID:str = None):
         
         # Skapar ett til fönster med funktioner för att ta bort uppvisade spel
         elif event == "Ändra spel":
-            games = df['name'].tolist()
+            games = dfPlot.dfPlaytimeHead.index.to_list()
             checkboxes = [[sg.Checkbox(name, key=f"chk_{name}")] for name in games]
 
             checkbox_column = sg.Column(checkboxes, scrollable=True, vertical_scroll_only=True, size=(300, 200))
@@ -383,7 +405,7 @@ def sgPlot(userID:str = None):
                     else:
                         # Tar bort de valda elementen
                         dfPlot.filterRows(checkedBoxes)
-                    displayPlot()
+                    updateData()
                     window2.close()
 
             window2.close()
@@ -424,7 +446,7 @@ def sgPlot(userID:str = None):
                             checkedBoxes.append(column)
                     print("Användaren bockade av: ", checkedBoxes)
                     dfPlot.dfPlaytime.drop(checkedBoxes, axis=1, inplace=True)
-                    displayPlot()
+                    updateData()
                     window3.close()
 
             window3.close()
@@ -437,7 +459,7 @@ def sgPlot(userID:str = None):
         # plottar datan
         elif event == 'Plot':
             # Ritar plot
-            displayPlot()
+            updateData()
 
 
     window.close()
